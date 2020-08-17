@@ -108,7 +108,7 @@ def accumulate(x, w=None, bbox=None, d=256):
     return A
 
 
-def lines_parameters(peaks, bbox, d):
+def lines(peaks, bbox, d):
     """
     Get homogeneous line parameters from location in the accumulator
     """
@@ -140,10 +140,10 @@ def find_peaks(A, t):
     Retrieve locations with prominent local maxima in the accumulator
     """
     prominence = dilation(A+1)/erosion(A+1)
-    peaks = peak_local_max(A, threshold_abs=t, min_distance=1)
+    peaks = peak_local_max(A, threshold_abs=t, min_distance=5)
     r,c = peaks[:,0], peaks[:,1]
     value = A[r,c]
-    valid = prominence[r,c] > 1.3
+    valid = prominence[r,c] > 1.5
     return peaks[valid], value[valid]
     
 
