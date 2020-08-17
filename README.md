@@ -1,6 +1,11 @@
 # pclines-python
 
-This package implements a Hough Trenaform for lines from paper `Dubska et al, PCLines - Line detection with parallel coordinates, CVPR 2011` with few little improvements.
+This package implements a PCLines Transform for line detection in images.
+
+Cite:
+```
+Dubska et al,PCLines - Line detection with parallel coordinates, CVPR 2011
+```
 
 # Requrements
 
@@ -9,9 +14,35 @@ This package implements a Hough Trenaform for lines from paper `Dubska et al, PC
 * numba
 * scikit-image
 
+# Installation
+
+The package is on [PyPI](https://pypi.org/project/pclines/), so just run following command and install the package.
+
+```shell
+> pip install pclines
+```
+
+Alternatively, you can download this repository and install manually.
+
+
 # Example
 
+1. Import package
+
+```python
+import pclines as pcl
+```
+
+2. Accumulation of observations
+The observations are 2D weighted coordinates enclosed by a known bounding box.
+
+```python
+A = pcl.accumulate()
+```
+
 TBD
+
+
 
 # Contribute
 
