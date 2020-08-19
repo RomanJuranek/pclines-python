@@ -31,7 +31,7 @@ References
 
 
 import numpy as np
-import numba as nb
+#import numba as nb
 from skimage.feature import peak_local_max
 from skimage.morphology.grey import erosion, dilation
 
@@ -42,6 +42,13 @@ def _linear_transform(src, dst):
     w = (d1 - d0) / (s1 - s0)
     b = d0 - w*s0
     return w, b
+
+
+def _check_points(x:np.ndarray):
+    if not isinstance(x, np.ndarray):
+        raise TypeError("Points must be numpy array")
+    if x.ndim != 2 or x.shape[1] != 2:
+        raise ValueError("Points must be 2D array with 2 columns")
 
 
 class Normalizer:
@@ -64,95 +71,99 @@ class Normalizer:
     __call__ = transform
 
 
-def accumulate(x, w=None, bbox=None, d=256):
+class PCLines:
     """
-    Accumulate observation in PCLines space
-
-    bbox : tuple
-        (x,y,w,h) format
+    Wrapper for PCLines accumulator of certain size
     """
-    # TODO: Check inputs
+    def __init__(self, bbox, d=256):
+        # TODO: check if bbox valid
 
+        # Init accumulator
+        shape = (d, 2*d-1)
+        self.A = np.zeros(shape, "f")
+        self.d = d
 
-    # Create accumulator
-    acc_shape = d,2*d-1
-    A = np.zeros(acc_shape, "f")  # The accumulator
-
-    # Axis normalizers
-    def normalizers():
         x,y,w,h = bbox
-        shape = (w,h)
-        ranges = d * np.array(shape)/max(shape)
+        bb_size = (w,h)
+        ranges = d * np.array(bb_size)/max(bb_size)
         ofs = (d-ranges) / 2
         (x0,y0),(x1,y1) = ofs, (ranges-1)+ofs
-        norm0 = Normalizer((y,y+h), (y1, y0))
-        norm1 = Normalizer((x,x+w), (x0, x1))
-        norm2 = Normalizer((y,y+h), (y0, y1))
-        return norm0, norm1, norm2
 
-    norm0, norm1, norm2 = normalizers()
+        self.norm_u = Normalizer((y,y+h+1), (y1, y0))
+        self.norm_v = Normalizer((x,x+w+1), (x0, x1))
+        self.norm_w = Normalizer((y,y+h+1), (y0, y1))
 
-    # Coordinates on parallel axes
-    x0,x1 = np.split(x,2,axis=1)
-    x = np.concatenate([norm0(x1), norm1(x0), norm2(x1)], axis=1)
+    def clear(self):
+        self.A[:] = 0
 
-    # Rasterize the lines
-    for a,b,c in x:  # remove space wraping
-        t_part = np.linspace(a,b,d)
-        s_part = np.linspace(b,c,d)
+    def transform(self, x):
+        """
+        Transform points x to the PCLines space and return polylines.
+
+        Input
+        -----
+        x : ndarray
+            Nx2 array with points
+
+        Output
+        ------
+        p : ndarray
+            Nx3 array with polyline coordinates for u, v, w parallel axes
+        """
+        _check_points(x)
+        x0,x1 = np.split(x,2,axis=1)
+        return np.concatenate([self.norm_u(x1), self.norm_v(x0), self.norm_w(x1)], axis=1)
+
+    def inverse(self, l):
+        """
+        Transform a point from PCLines to homogeneous parameters of line
+        """
+        d = self.d
+        x,y,w,h = self.bbox
+        m = max(w, h) - 1
+        norm_v = Normalizer((0,d-1),(-m/2, m/2))
+
+        u,v = l[:,1], l[:,0]
+        u = u - (d - 1)
+        v = norm_v(v)
+
+        f = u < 0
+        h = np.array([f*(d+u)+(1-f)*(d-u), u, -v*d], "f").T  # TODO: add reference to eq in paper
+        tx,ty = x+0.5*w, y+0.5*h
+        h[:,2] -= h[:,0]*tx + h[:,1]*ty
+        return h
+
+    def valid_points(self, p):
+        return np.all(np.logical_and(p>=0, p<self.d), axis=1)
+
+    def insert(self, x, weight=None):
+        """
+        """
+        p = self.transform(x)
+        n = p.shape[0]
+
+        if weight is None:
+            weight = np.ones(n, np.float32)
+
+        valid = self.valid_points(p)
+        p = p[valid]
+        weight = weight[valid.flat]
+
+        d = self.d
         c = np.arange(2*d-1,dtype="i")
-        r = np.concatenate([t_part, s_part[1:]]).astype("i")
-        #print(r,c)
-        A[r,c] += 1
+        for (u,v,w),wt in zip(p, weight):  # remove space wraping
+            t_part = np.linspace(u,v,d)
+            s_part = np.linspace(v,w,d)
+            r = np.concatenate([t_part, s_part[1:]]).astype("i")
+            self.A[r,c] += wt  # TODO add weight
 
-    return A
-
-
-def lines(peaks, bbox, d):
-    """
-    Get homogeneous line parameters from location in the accumulator
-    """
-    u = peaks[:,1]
-    v = peaks[:,0]
-    #centrovanie
-    u = u - (d - 1)
-    x,y,w,h = bbox
-    shape = w,h
-    m = max(shape) - 1
-    normV = Normalizer((0,d-1),(-m/2, m/2))
-    v = normV(v)
-    f = u < 0
-    l = np.array([f*(d+u)+(1-f)*(d-u), u, -v*d], "f").T  # TODO: add reference to eq in paper
-    tx,ty = x+0.5*w, y+0.5*h
-    l[:,2] -= l[:,0]*tx + l[:,1]*ty 
-    return l
-    
-
-
-@nb.njit("(f4[:,:],f4[:,:],i4)")
-def rasterize_polylines(lines, acc, d):
-    """
-    """
-
-
-def find_peaks(A, t):
-    """
-    Retrieve locations with prominent local maxima in the accumulator
-    """
-    prominence = dilation(A+1)/erosion(A+1)
-    peaks = peak_local_max(A, threshold_abs=t, min_distance=5)
-    r,c = peaks[:,0], peaks[:,1]
-    value = A[r,c]
-    valid = prominence[r,c] > 1.5
-    return peaks[valid], value[valid]
-    
-
-def get_lines(image):
-    """
-    PCLines transform of an image
-    """
-    # TODO: Get edges
-    # TODO: Accumulate
-    # TODO: Locate peaks
-    # TODO: Transform peaks to line parameters
-    pass
+    def find_peaks(self, t=0.8, prominence=2, min_dist=1):
+        """
+        Retrieve locations with prominent local maxima in the accumulator
+        """
+        p = dilation(self.A+1)/erosion(self.A+1)
+        peaks = peak_local_max(self.A, threshold_rel=t, min_distance=min_dist)
+        r,c = peaks[:,0], peaks[:,1]
+        value = A[r,c]
+        valid = p[r,c] > prominence
+        return peaks[valid], value[valid]
