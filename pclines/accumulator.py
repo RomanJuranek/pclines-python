@@ -36,6 +36,7 @@ from skimage.morphology.grey import erosion, dilation
 
 from .rasterizer import polys
 
+
 def _linear_transform(src, dst):
     """ Parameters of a linear transform from range specifications """
     (s0, s1), (d0,d1) = src, dst
@@ -44,11 +45,21 @@ def _linear_transform(src, dst):
     return w, b
 
 
-def _check_points(x:np.ndarray):
+def _validate_points(x:np.ndarray):
     if not isinstance(x, np.ndarray):
         raise TypeError("Points must be numpy array")
     if x.ndim != 2 or x.shape[1] != 2:
         raise ValueError("Points must be 2D array with 2 columns")
+
+
+def _validate_bbox(bbox):
+    if not isinstance(bbox, (tuple, list, np.ndarray)):
+        raise TypeError("bbox must be tuple, list or numpy array")
+    if len(bbox) != 4:
+        raise ValueError("bbox must contain 4 elements")
+    x,y,w,h = np.array(bbox,"f")
+    if w <= 0 or h <= 0:
+        raise ValueError("bbox width and heigh must be positive")
 
 
 class Normalizer:
@@ -76,22 +87,35 @@ class PCLines:
     Wrapper for PCLines accumulator of certain size
     """
     def __init__(self, bbox, d=256):
-        # TODO: check if bbox valid
+        _validate_bbox(bbox)
+        self.bbox = bbox
 
         # Init accumulator
-        shape = (d, 2*d-1)
+        shape = d, 2*d-1
         self.A = np.zeros(shape, "f")
         self.d = d
 
-        x,y,w,h = bbox
-        bb_size = (w,h)
-        ranges = d * np.array(bb_size)/max(bb_size)
+        ranges = d * np.array(self.input_shape)/self.scale
         ofs = (d-ranges) / 2
         (x0,y0),(x1,y1) = ofs, (ranges-1)+ofs
 
+        x,y = self.origin
+        w,h = self.input_shape
         self.norm_u = Normalizer((y,y+h+1), (y1, y0))
         self.norm_v = Normalizer((x,x+w+1), (x0, x1))
         self.norm_w = Normalizer((y,y+h+1), (y0, y1))
+
+    @property
+    def origin(self):
+        return self.bbox[:2]
+
+    @property
+    def input_shape(self):
+        return self.bbox[2:]
+
+    @property
+    def scale(self):
+        return max(self.input_shape)
 
     def clear(self):
         self.A[:] = 0
@@ -110,7 +134,7 @@ class PCLines:
         p : ndarray
             Nx3 array with polyline coordinates for u, v, w parallel axes
         """
-        _check_points(x)
+        _validate_points(x)
         x0,x1 = np.split(x,2,axis=1)
         return np.concatenate([self.norm_u(x1), self.norm_v(x0), self.norm_w(x1)], axis=1).astype("f")
 
@@ -119,8 +143,7 @@ class PCLines:
         Transform a point from PCLines to homogeneous parameters of line
         """
         d = self.d
-        x,y,w,h = self.bbox
-        m = max(w, h) - 1
+        m = self.scale - 1
         norm_v = Normalizer((0,d-1),(-m/2, m/2))
 
         u,v = l[:,1], l[:,0]
@@ -128,10 +151,12 @@ class PCLines:
         v = norm_v(v)
 
         f = u < 0
-        h = np.array([f*(d+u)+(1-f)*(d-u), u, -v*d], "f").T  # TODO: add reference to eq in paper
+        lines = np.array([f*(d+u)+(1-f)*(d-u), u, -v*d], "f").T  # TODO: add reference to eq in paper
+        x,y = self.origin
+        w,h = self.input_shape
         tx,ty = x+0.5*w, y+0.5*h
-        h[:,2] -= h[:,0]*tx + h[:,1]*ty
-        return h
+        lines[:,2] -= lines[:,0]*tx + lines[:,1]*ty
+        return lines
 
     def valid_points(self, p):
         return np.all(np.logical_and(p>=0, p<self.d), axis=1)
