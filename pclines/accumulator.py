@@ -31,10 +31,10 @@ References
 
 
 import numpy as np
-#import numba as nb
 from skimage.feature import peak_local_max
 from skimage.morphology.grey import erosion, dilation
 
+from .rasterizer import polys
 
 def _linear_transform(src, dst):
     """ Parameters of a linear transform from range specifications """
@@ -112,7 +112,7 @@ class PCLines:
         """
         _check_points(x)
         x0,x1 = np.split(x,2,axis=1)
-        return np.concatenate([self.norm_u(x1), self.norm_v(x0), self.norm_w(x1)], axis=1)
+        return np.concatenate([self.norm_u(x1), self.norm_v(x0), self.norm_w(x1)], axis=1).astype("f")
 
     def inverse(self, l):
         """
@@ -145,25 +145,23 @@ class PCLines:
         if weight is None:
             weight = np.ones(n, np.float32)
 
+        if weight.dtype != np.float32:
+            weight = weight.astype(np.float32)
+
         valid = self.valid_points(p)
         p = p[valid]
         weight = weight[valid.flat]
 
-        d = self.d
-        c = np.arange(2*d-1,dtype="i")
-        for (u,v,w),wt in zip(p, weight):  # remove space wraping
-            t_part = np.linspace(u,v,d)
-            s_part = np.linspace(v,w,d)
-            r = np.concatenate([t_part, s_part[1:]]).astype("i")
-            self.A[r,c] += wt  # TODO add weight
+        polys(p, weight, self.A)
+        
 
     def find_peaks(self, t=0.8, prominence=2, min_dist=1):
         """
         Retrieve locations with prominent local maxima in the accumulator
         """
         p = dilation(self.A+1)/erosion(self.A+1)
-        peaks = peak_local_max(self.A, threshold_rel=t, min_distance=min_dist)
+        peaks = peak_local_max(self.A, threshold_rel=t, min_distance=min_dist, exclude_border=False)
         r,c = peaks[:,0], peaks[:,1]
-        value = A[r,c]
+        value = self.A[r,c]
         valid = p[r,c] > prominence
         return peaks[valid], value[valid]
