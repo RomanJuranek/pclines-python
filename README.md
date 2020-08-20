@@ -1,10 +1,16 @@
-# pclines-python
+# `pclines` package for Python
 
-This package implements a PCLines Transform for line detection in images.
+![pclines](doc/pclines.svg)
 
-Cite:
-```
-Dubska et al,PCLines - Line detection with parallel coordinates, CVPR 2011
+This package implements a PCLines transform for line detection in images.
+
+```bibtex
+@INPROCEEDINGS{dubska2011pclines,
+    author={M. {Dubská} and A. {Herout} and J. {Havel}},
+    booktitle={CVPR 2011},
+    title={PClines — Line detection using parallel coordinates},
+    year={2011},
+}
 ```
 
 # Requrements
@@ -36,11 +42,7 @@ import pclines as pcl
 2. Accumulation of observations
 The observations are 2D weighted coordinates enclosed by a known bounding box.
 
-```python
-A = pcl.accumulate()
-```
-
-TBD
+*TBD*
 
 
 
