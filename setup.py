@@ -7,7 +7,7 @@ with open(os.path.join(current_folder, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='pclines',
-    version='0.0.1-dev',
+    version='1.0.0',
     description='PCLines transform for python',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -19,7 +19,6 @@ setup(
     packages=["pclines"],
     python_requires='>=3.6',
     project_urls={
-        "Bug report": 'https://github.com/RomanJuranek/pclines-python/issues',
-        
+        "Bug reports": 'https://github.com/RomanJuranek/pclines-python/issues',
     },
 )
