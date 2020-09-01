@@ -7,7 +7,7 @@ with open(os.path.join(current_folder, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='pclines',
-    version='1.0.0',
+    version='1.0.1',
     description='PCLines transform for python',
     long_description=long_description,
     long_description_content_type='text/markdown',
