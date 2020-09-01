@@ -1,32 +1,14 @@
 """
-PCLines transform for line detection
-
-This package implements the method from
-    Dubska et al, PCLines - Line detection with parallel coordinates, CVPR 2011
-
-
-Module
-------
-The module provides a high-level function for line detection in image
-and also low-level functions for
+The module provides the class PCLines with "low level" functions for
 * accumulation of observations to PCLines space,
 * point mapping from PCLines space to homogeneous lines
 that can be used to construct a custom PCLines transform of user-defined
-edge points.
-
-
-See also
---------
-* pclines.accumulate
-* pclines.find_peaks
-* pclines.line_parameters
+edge points (observations).
 
 
 References
 ----------
 [1] Dubska et al, PCLines - Line detection with parallel coordinates, CVPR 2011
-
-
 """
 
 
@@ -167,17 +149,21 @@ class PCLines:
 
     @property
     def origin(self):
+        """ The origin of the bounding box of the observations """
         return self.bbox[:2]
 
     @property
     def input_shape(self):
+        """ Size of the bounding box """
         return self.bbox[2:]
 
     @property
     def scale(self):
+        """ Larger side of the bounding box """
         return max(self.input_shape)
 
     def clear(self):
+        """ Set the accumulator to 0 """
         self.A[:] = 0
 
     def transform(self, x):
@@ -219,10 +205,22 @@ class PCLines:
         return lines
 
     def valid_points(self, p):
+        """ Check if the points fits the accumulator """
         return np.all(np.logical_and(p>=0, p<self.d), axis=1)
 
     def insert(self, x, weight=None):
-        """
+        """ Insert observations x to the accumulator
+
+        Inputs
+        ------
+        x : ndarray
+            (N,2) observations
+        weights : ndarray or None
+            Weight of each observation in accumulator (defaults to 1 in None)
+
+        Notes
+        -----
+        Any observation outside the bounding box is ignored.
         """
         p = self.transform(x)
         n = p.shape[0]
