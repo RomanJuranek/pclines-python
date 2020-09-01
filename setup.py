@@ -17,6 +17,7 @@ setup(
     license='BSD3',
     keywords='pclines, hough transform, line detection',
     packages=["pclines"],
+    install_requires=['numpy','numba','scikit-image']
     python_requires='>=3.6',
     project_urls={
         "Bug reports": 'https://github.com/RomanJuranek/pclines-python/issues',
