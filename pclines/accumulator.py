@@ -15,6 +15,7 @@ References
 import numpy as np
 from skimage.feature import peak_local_max
 from skimage.morphology.grey import erosion, dilation
+from skimage.morphology import disk
 
 from .rasterizer import polys
 
@@ -238,11 +239,12 @@ class PCLines:
         polys(p, weight, self.A)
         
 
-    def find_peaks(self, t=0.8, prominence=2, min_dist=1):
+    def find_peaks(self, t=0.8, prominence=2, prominence_radius=2, min_dist=1):
         """
         Retrieve locations with prominent local maxima in the accumulator
         """
-        p = dilation(self.A+1)/erosion(self.A+1)
+        selem = disk(prominence_radius)
+        p = dilation(self.A+1, selem=selem)/erosion(self.A+1, selem=selem)
         peaks = peak_local_max(self.A, threshold_rel=t, min_distance=min_dist, exclude_border=False)
         r,c = peaks[:,0], peaks[:,1]
         value = self.A[r,c]
